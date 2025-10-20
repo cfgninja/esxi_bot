@@ -1,4 +1,4 @@
-import ssl, os, time, threading, re, logging, fcntl, sys, uuid
+import ssl, os, time, threading, re, logging, sys, uuid, tempfile, atexit
 
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
 from telegram import (
@@ -12,17 +12,62 @@ from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 from dotenv import load_dotenv
 
-# ---------- SINGLE INSTANCE LOCK -----------
+# ---------- SINGLE INSTANCE LOCK (cross-platform) -----------
+# Try POSIX fcntl lock when available (typical for Linux). On Windows fallback
+# to creating an exclusive lockfile in the system temp directory using O_EXCL.
 LOCK_PATH = "/var/run/esxi_bot.lock"
+_lock_file = None
+_lock_path_created = None
 try:
-    _lock_file = open(LOCK_PATH, "w")
-    fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    _lock_file.write(str(os.getpid()))
-    _lock_file.flush()
-except OSError:
-    sys.stderr.write("Another esxi_bot instance is already running. Exiting.\n")
-    sys.exit(1)
-# ------------------------------------------
+    import fcntl  # type: ignore
+    # POSIX path: try to use configured LOCK_PATH, fall back to tmp if not writable
+    try:
+        _lock_file = open(LOCK_PATH, "w")
+    except Exception:
+        LOCK_PATH = os.path.join(tempfile.gettempdir(), "esxi_bot.lock")
+        _lock_file = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _lock_file.write(str(os.getpid()))
+        _lock_file.flush()
+    except OSError:
+        sys.stderr.write("Another esxi_bot instance is already running. Exiting.\n")
+        sys.exit(1)
+except Exception:
+    # Fallback for platforms without fcntl (Windows). Use atomic create (O_EXCL).
+    LOCK_PATH = os.path.join(tempfile.gettempdir(), "esxi_bot.lock")
+    try:
+        fd = os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, "w") as f:
+            f.write(str(os.getpid()))
+            f.flush()
+        # Keep a reference so the file isn't garbage collected; will be removed on exit
+        _lock_file = open(LOCK_PATH, "r")
+        _lock_path_created = True
+    except FileExistsError:
+        sys.stderr.write("Another esxi_bot instance is already running. Exiting.\n")
+        sys.exit(1)
+# Ensure we cleanup lock on exit when possible
+def _cleanup_lock():
+    global _lock_file, LOCK_PATH, _lock_path_created
+    try:
+        if _lock_file:
+            try:
+                _lock_file.close()
+            except Exception:
+                pass
+            _lock_file = None
+        # remove lock file if it exists in temp dir or if we flagged it was created by us
+        if LOCK_PATH and os.path.exists(LOCK_PATH) and (_lock_path_created or os.path.dirname(LOCK_PATH) == tempfile.gettempdir()):
+            try:
+                os.unlink(LOCK_PATH)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+atexit.register(_cleanup_lock)
+# ------------------------------------------------------------
 
 # ---------- LOGGING ----------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
