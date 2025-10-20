@@ -12,7 +12,7 @@ from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 from dotenv import load_dotenv
 
-# ---------- SINGLE INSTANCE LOCK ----------
+# ---------- SINGLE INSTANCE LOCK -----------
 LOCK_PATH = "/var/run/esxi_bot.lock"
 try:
     _lock_file = open(LOCK_PATH, "w")
