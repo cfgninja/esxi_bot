@@ -11,6 +11,7 @@ from telegram import (
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 from dotenv import load_dotenv
+from telegram.error import BadRequest
 
 # ---------- SINGLE INSTANCE LOCK (cross-platform) -----------
 # Try POSIX fcntl lock when available (typical for Linux). On Windows fallback
@@ -360,13 +361,27 @@ def _restore_card(bot, chat_id, msg_id, vcidx, vm_name):
         content = si.RetrieveContent()
         vm = find_vm(content, vm_name)
         if vm:
-            bot.edit_message_text(
-                chat_id=chat_id, message_id=msg_id,
-                text=build_base_text(vm, vcidx),
-                reply_markup=vm_action_keyboard(vm, vcidx)
-            )
+            safe_edit_message(bot, chat_id=chat_id, message_id=msg_id,
+                              text=build_base_text(vm, vcidx),
+                              reply_markup=vm_action_keyboard(vm, vcidx))
     finally:
         if si: Disconnect(si)
+
+def safe_edit_message(target, *args, **kwargs):
+    """Call edit_message_text on target (Bot or CallbackQuery) and ignore
+    BadRequest "Message is not modified" errors which are benign.
+    """
+    try:
+        # target can be a Bot instance or a CallbackQuery (both have edit_message_text)
+        return target.edit_message_text(*args, **kwargs)
+    except BadRequest as e:
+        if "Message is not modified" in str(e):
+            log.debug("Ignored BadRequest: Message is not modified")
+            return None
+        raise
+    except Exception:
+        # re-raise other exceptions
+        raise
 
 def _present_confirm(q, vcidx: int, vm_name: str, action: str, action_text: str, jq):
     nonce = _new_nonce()
@@ -380,10 +395,8 @@ def _present_confirm(q, vcidx: int, vm_name: str, action: str, action_text: str,
             "action":  action,   # 'on' | 'off' | 'reboot'
             "expires": time.time() + CONFIRM_TTL
         }
-    q.edit_message_text(
-        f"• {vm_name} — подтвердите действие: {action_text}\n⏳ Истечёт через {CONFIRM_TTL} сек.",
-        reply_markup=_confirm_keyboard(nonce, action_text)
-    )
+    safe_edit_message(q, f"• {vm_name} — подтвердите действие: {action_text}\n⏳ Истечёт через {CONFIRM_TTL} сек.",
+                      reply_markup=_confirm_keyboard(nonce, action_text))
 
     def _expire(context):
         with PC_GUARD:
@@ -412,11 +425,11 @@ def _do_power_action(q, context, vcidx: int, vm_name: str, action: str):
         content = si.RetrieveContent()
         vm = find_vm(content, vm_name)
         if not vm:
-            q.edit_message_text(f"• {vm_name} (недоступна)"); return
+            safe_edit_message(q, f"• {vm_name} (недоступна)"); return
 
         base = build_base_text(vm, vcidx)
-        q.edit_message_text(base + f"\n\n⏳ {'Включаю' if action=='on' else 'Выключаю'} {vm_name}…",
-                            reply_markup=busy_keyboard())
+        safe_edit_message(q, base + f"\n\n⏳ {'Включаю' if action=='on' else 'Выключаю'} {vm_name}…",
+                          reply_markup=busy_keyboard())
 
         result, path = False, "-"
         if action == "on":
@@ -441,14 +454,14 @@ def _do_power_action(q, context, vcidx: int, vm_name: str, action: str):
 
         base = build_base_text(vm, vcidx)
         if result:
-            q.edit_message_text(base + f"\n\n✅ {vm_name}: выполнено ({path}).",
-                                reply_markup=vm_action_keyboard(vm, vcidx))
+            safe_edit_message(q, base + f"\n\n✅ {vm_name}: выполнено ({path}).",
+                              reply_markup=vm_action_keyboard(vm, vcidx))
             context.job_queue.run_once(_restore_card_job, when=SUCCESS_TTL,
                 context={"chat_id": q.message.chat_id, "message_id": q.message.message_id,
                          "vm_name": vm.name, "vcidx": vcidx})
         else:
-            q.edit_message_text(base + f"\n\n❌ {vm_name}: не удалось подтвердить результат. Проверьте в vCenter.",
-                                reply_markup=vm_action_keyboard(vm, vcidx))
+            safe_edit_message(q, base + f"\n\n❌ {vm_name}: не удалось подтвердить результат. Проверьте в vCenter.",
+                              reply_markup=vm_action_keyboard(vm, vcidx))
     finally:
         try: lock.release()
         except Exception: pass
@@ -469,10 +482,10 @@ def _do_reboot_action(q, context, vcidx: int, vm_name: str):
         content = si.RetrieveContent()
         vm = find_vm(content, vm_name)
         if not vm:
-            q.edit_message_text(f"• {vm_name} (недоступна)"); return
+            safe_edit_message(q, f"• {vm_name} (недоступна)"); return
 
         base = build_base_text(vm, vcidx)
-        q.edit_message_text(base + f"\n\n⏳ Перезагружаю {vm_name}…", reply_markup=busy_keyboard())
+        safe_edit_message(q, base + f"\n\n⏳ Перезагружаю {vm_name}…", reply_markup=busy_keyboard())
 
         result, path = False, "-"
         try:
@@ -489,14 +502,14 @@ def _do_reboot_action(q, context, vcidx: int, vm_name: str):
 
         base = build_base_text(vm, vcidx)
         if result:
-            q.edit_message_text(base + f"\n\n✅ {vm_name}: перезагрузка выполнена ({path}).",
-                                reply_markup=vm_action_keyboard(vm, vcidx))
+            safe_edit_message(q, base + f"\n\n✅ {vm_name}: перезагрузка выполнена ({path}).",
+                              reply_markup=vm_action_keyboard(vm, vcidx))
             context.job_queue.run_once(_restore_card_job, when=SUCCESS_TTL,
                 context={"chat_id": q.message.chat_id, "message_id": q.message.message_id,
                          "vm_name": vm.name, "vcidx": vcidx})
         else:
-            q.edit_message_text(base + f"\n\n❌ {vm_name}: не удалось подтвердить перезагрузку. Проверьте в vCenter.",
-                                reply_markup=vm_action_keyboard(vm, vcidx))
+            safe_edit_message(q, base + f"\n\n❌ {vm_name}: не удалось подтвердить перезагрузку. Проверьте в vCenter.",
+                              reply_markup=vm_action_keyboard(vm, vcidx))
     finally:
         try: lock.release()
         except Exception: pass
@@ -532,7 +545,7 @@ def cb_choose_vc(update, context):
         q.answer("Некорректные данные.", show_alert=True); return
     SELECTED_VC[q.message.chat.id] = idx
     q.answer(f"Выбрано: {VCENTERS[idx]['name']}")
-    q.edit_message_text(f"✅ Выбран vCenter: {VCENTERS[idx]['name']}")
+    safe_edit_message(q, f"✅ Выбран vCenter: {VCENTERS[idx]['name']}")
 
 @restricted
 @rate_limited
@@ -545,15 +558,17 @@ def cb_info(update, context):
     except Exception:
         q.answer("Некорректные данные кнопки.", show_alert=True); return
     q.answer()
-
     si = vcenter_connect(vcidx)
     try:
         content = si.RetrieveContent()
         vm = find_vm(content, vm_name)
-        if not vm: q.edit_message_text(f"• {vm_name} (недоступна)"); return
+        if not vm:
+            safe_edit_message(q, f"• {vm_name} (недоступна)")
+            return
 
         annotation = (vm.config.annotation or "").strip() if vm.config else ""
-        if not annotation: annotation = "—"
+        if not annotation:
+            annotation = "—"
 
         base = build_base_text(vm, vcidx)
         info = (f"\n\n🔍 Информация о {vm.name}\n"
@@ -562,7 +577,8 @@ def cb_info(update, context):
                 f"Гостевая ОС: {vm.config.guestFullName}\n"
                 f"Описание: {annotation}\n"
                 f"IP: {getattr(vm.guest, 'ipAddress', 'n/a')}")
-        q.edit_message_text(base + info, reply_markup=vm_action_keyboard(vm, vcidx))
+
+        safe_edit_message(q, base + info, reply_markup=vm_action_keyboard(vm, vcidx))
 
         context.job_queue.run_once(_restore_card_job, when=INFO_TTL,
             context={"chat_id": q.message.chat_id, "message_id": q.message.message_id,
