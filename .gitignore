@@ -1,0 +1,41 @@
+# ===== Python build/cache =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ===== Virtual environments =====
+.venv/
+venv/
+env/
+ENV/
+.Python
+
+# ===== Logs and temp files =====
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ===== IDE/project configs =====
+.vscode/
+.idea/
+*.iml
+
+# ===== OS files =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Secrets and environment =====
+.env
+.env.*
+*.key
+*.pem
+*.crt
+
+# ===== Other =====
+*.zip
+*.rar
