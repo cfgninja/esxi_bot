@@ -678,7 +678,7 @@ def any_text_handler(update: Update, context: CallbackContext):
             "⛔ У вас нет прав на использование этого бота.\nСвяжитесь с администратором для получения доступа.",
             reply_markup=command_keyboard(False),
         )
-        if text == "ℹ️ Мои права":
+        if text == "ℹ️ Мой доступ":
             context.args = []
             whoami(update, context)
         return
@@ -697,7 +697,7 @@ def any_text_handler(update: Update, context: CallbackContext):
         context.args = []
         searchvm(update, context)
         return
-    if button == "ℹ️ Мои права":
+    if button == "ℹ️ Мой доступ":
         context.args = []
         whoami(update, context)
         return

@@ -56,7 +56,7 @@ def vm_action_keyboard(vm, vcidx: int) -> InlineKeyboardMarkup:
 
 
 def choose_vc_keyboard() -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(f"{i + 1}. {vc['name']} ({vc['host']})", callback_data=f"choosevc:{i}")]
+    rows = [[InlineKeyboardButton(f"{i + 1}. {vc['name']}", callback_data=f"choosevc:{i}")]
             for i, vc in enumerate(VCENTERS)]
     return InlineKeyboardMarkup(rows)
 
@@ -102,14 +102,14 @@ def set_menu_for_chat(bot, chat_id: int, allowed: bool) -> None:
 
 def whoami_text(user_id: Optional[int]) -> str:
     allowed = "да" if user_id and user_id in ALLOWED_USERS else "нет"
-    return f"👤 Ваш Telegram ID: {user_id}\nДоступ к боту (allowed): {allowed}"
+    return f"👤 Ваш Telegram ID: {user_id}\nДоступ к боту: {allowed}"
 
 
 def command_keyboard(allowed: bool) -> ReplyKeyboardMarkup:
     if allowed:
-        rows = [["📡 Выбрать vCenter", "💻 Список ВМ"], ["🔍 Поиск ВМ", "ℹ️ Мои права"]]
+        rows = [["📡 Выбрать vCenter", "💻 Список ВМ"], ["🔍 Поиск ВМ", "ℹ️ Мой доступ"]]
     else:
-        rows = [["ℹ️ Мои права"]]
+        rows = [["ℹ️ Мой доступ"]]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
