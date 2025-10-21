@@ -574,7 +574,10 @@ def listvm(update: Update, context: CallbackContext):
     set_search_await(chat_id, uid, False)
 
     if chat_id not in SELECTED_VC:
-        update.message.reply_text("❗ Сначала выберите vCenter командой /listvc.")
+        update.message.reply_text(
+            "❗ Сначала выберите vCenter — нажмите кнопку «📡 Выбрать vCenter».",
+            reply_markup=command_keyboard(True),
+        )
         return
 
     vcidx = SELECTED_VC[chat_id]
