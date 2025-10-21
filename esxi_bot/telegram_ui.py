@@ -29,6 +29,7 @@ __all__ = [
     "set_menu_for_chat",
     "whoami_text",
     "command_keyboard",
+    "start_keyboard",
 ]
 
 
@@ -111,3 +112,7 @@ def command_keyboard(allowed: bool) -> ReplyKeyboardMarkup:
     else:
         rows = [["ℹ️ Мои права"]]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def start_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup([["▶️ Начать"]], resize_keyboard=True, one_time_keyboard=True)

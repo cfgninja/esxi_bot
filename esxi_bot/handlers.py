@@ -40,10 +40,11 @@ from .telegram_ui import (
     busy_keyboard,
     build_base_text,
     choose_vc_keyboard,
+    command_keyboard,
     confirm_keyboard,
     safe_edit_message,
     set_menu_for_chat,
-    command_keyboard,
+    start_keyboard,
     vm_action_keyboard,
     whoami_text,
 )
@@ -370,6 +371,20 @@ def _cb_pre(update: Update, context: CallbackContext) -> None:
         set_search_await(update.effective_chat.id, uid, False)
 
 
+def _send_main_menu(update: Update, context: CallbackContext, allowed: bool) -> None:
+    message = update.effective_message
+    if not message:
+        return
+    if allowed:
+        text = "✅ Привет! Это бот управления vCenter.\nВыберите действие кнопками ниже."
+    else:
+        text = (
+            "✅ Привет! Это бот управления vCenter.\n"
+            "Нажмите «ℹ️ Мои права», чтобы узнать свой ID и запросить доступ."
+        )
+    message.reply_text(text, reply_markup=command_keyboard(allowed))
+
+
 @restricted
 @rate_limited
 def cb_noop(update: Update, context: CallbackContext):
@@ -548,14 +563,16 @@ def start(update: Update, context: CallbackContext):
     allowed = bool(uid and uid in ALLOWED_USERS)
     set_menu_for_chat(context.bot, update.effective_chat.id, allowed=allowed)
     set_search_await(update.effective_chat.id, uid, False)
-    if allowed:
-        text = "✅ Привет! Это бот управления vCenter.\nВыберите действие кнопками ниже."
-    else:
-        text = (
-            "✅ Привет! Это бот управления vCenter.\n"
-            "Нажмите кнопку ниже, чтобы узнать ваш ID и запросить доступ."
+    if context.user_data.get("menu_started"):
+        _send_main_menu(update, context, allowed)
+        return
+
+    message = update.effective_message
+    if message:
+        message.reply_text(
+            "✅ Привет! Это бот управления vCenter.\nНажмите кнопку «▶️ Начать», чтобы продолжить.",
+            reply_markup=start_keyboard(),
         )
-    update.message.reply_text(text, reply_markup=command_keyboard(allowed))
 
 
 @restricted
@@ -650,6 +667,12 @@ def any_text_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     text = (update.message.text or "").strip()
 
+    if text == "▶️ Начать":
+        context.user_data["menu_started"] = True
+        allowed = bool(uid and uid in ALLOWED_USERS)
+        _send_main_menu(update, context, allowed)
+        return
+
     set_menu_for_chat(context.bot, chat_id, allowed=bool(uid and uid in ALLOWED_USERS))
     if uid not in ALLOWED_USERS:
         update.message.reply_text(
@@ -660,6 +683,8 @@ def any_text_handler(update: Update, context: CallbackContext):
             context.args = []
             whoami(update, context)
         return
+
+    context.user_data.setdefault("menu_started", True)
     button = text
     if button == "📡 Выбрать vCenter":
         context.args = []
