@@ -6,7 +6,7 @@ import re
 import time
 from typing import Callable, Optional
 
-from telegram import ReplyKeyboardRemove, Update
+from telegram import Update
 from telegram.ext import CallbackContext
 
 from .config import (
@@ -43,6 +43,7 @@ from .telegram_ui import (
     confirm_keyboard,
     safe_edit_message,
     set_menu_for_chat,
+    command_keyboard,
     vm_action_keyboard,
     whoami_text,
 )
@@ -547,15 +548,14 @@ def start(update: Update, context: CallbackContext):
     allowed = bool(uid and uid in ALLOWED_USERS)
     set_menu_for_chat(context.bot, update.effective_chat.id, allowed=allowed)
     set_search_await(update.effective_chat.id, uid, False)
-    text_allowed = (
-        "✅ Привет! Это бот управления vCenter.\n"
-        "• /listvc — выбрать vCenter.\n"
-        "• /listvm — список ВМ выбранного vCenter.\n"
-        "• /searchvm — поиск ВМ по всем vCenter.\n"
-        "• /whoami — показать ваш ID и права."
-    )
-    text_denied = "✅ Привет! Это бот управления vCenter.\n• /whoami — показать ваш ID и права."
-    update.message.reply_text(text_allowed if allowed else text_denied, reply_markup=ReplyKeyboardRemove())
+    if allowed:
+        text = "✅ Привет! Это бот управления vCenter.\nВыберите действие кнопками ниже."
+    else:
+        text = (
+            "✅ Привет! Это бот управления vCenter.\n"
+            "Нажмите кнопку ниже, чтобы узнать ваш ID и запросить доступ."
+        )
+    update.message.reply_text(text, reply_markup=command_keyboard(allowed))
 
 
 @restricted
@@ -623,7 +623,11 @@ def searchvm(update: Update, context: CallbackContext):
         ch, user = data["chat_id"], data["user_id"]
         if consume_search_timeout(ch, user):
             try:
-                context_job.bot.send_message(chat_id=ch, text="⏱ Время ожидания истекло. Повторите команду /searchvm.")
+                context_job.bot.send_message(
+                    chat_id=ch,
+                    text="⏱ Время ожидания истекло. Повторите команду кнопкой /searchvm.",
+                    reply_markup=command_keyboard(user in ALLOWED_USERS),
+                )
             except Exception:
                 pass
 
@@ -645,7 +649,10 @@ def any_text_handler(update: Update, context: CallbackContext):
 
     set_menu_for_chat(context.bot, chat_id, allowed=bool(uid and uid in ALLOWED_USERS))
     if uid not in ALLOWED_USERS:
-        _deny(update, "⛔ У вас нет прав на использование этого бота.\nСвяжитесь с администратором для получения доступа.")
+        update.message.reply_text(
+            "⛔ У вас нет прав на использование этого бота.\nСвяжитесь с администратором для получения доступа.",
+            reply_markup=command_keyboard(False),
+        )
         return
     if not text or text.startswith("/"):
         return
@@ -656,5 +663,6 @@ def any_text_handler(update: Update, context: CallbackContext):
         return
 
     update.message.reply_text(
-        "Я понимаю только команды. Используйте меню или /listvc, /listvm, /searchvm, /whoami."
+        "Я понимаю только команды. Используйте кнопки ниже.",
+        reply_markup=command_keyboard(True),
     )

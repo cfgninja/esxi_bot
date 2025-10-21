@@ -5,7 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    BotCommand,
+    BotCommandScopeChat,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+)
 from telegram.error import BadRequest
 
 from .config import ALLOWED_USERS, ALLOWED_VMS, DENY_VMS, VCENTERS
@@ -22,6 +28,7 @@ __all__ = [
     "safe_edit_message",
     "set_menu_for_chat",
     "whoami_text",
+    "command_keyboard",
 ]
 
 
@@ -96,3 +103,11 @@ def set_menu_for_chat(bot, chat_id: int, allowed: bool) -> None:
 def whoami_text(user_id: Optional[int]) -> str:
     allowed = "да" if user_id and user_id in ALLOWED_USERS else "нет"
     return f"👤 Ваш Telegram ID: {user_id}\nДоступ к боту (allowed): {allowed}"
+
+
+def command_keyboard(allowed: bool) -> ReplyKeyboardMarkup:
+    if allowed:
+        rows = [["/listvc", "/listvm"], ["/searchvm", "/whoami"]]
+    else:
+        rows = [["/whoami"]]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
