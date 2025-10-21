@@ -371,8 +371,8 @@ def _cb_pre(update: Update, context: CallbackContext) -> None:
 
 
 def _send_main_menu(update: Update, context: CallbackContext, allowed: bool) -> None:
-    message = update.effective_message
-    if not message:
+    chat = update.effective_chat
+    if not chat:
         return
     if allowed:
         text = "✅ Привет! Это бот управления vCenter.\nВыберите действие кнопками ниже."
@@ -381,7 +381,10 @@ def _send_main_menu(update: Update, context: CallbackContext, allowed: bool) -> 
             "✅ Привет! Это бот управления vCenter.\n"
             "Нажмите «ℹ️ Мои права», чтобы узнать свой ID и запросить доступ."
         )
-    message.reply_text(text, reply_markup=command_keyboard(allowed))
+    try:
+        context.bot.send_message(chat_id=chat.id, text=text, reply_markup=command_keyboard(allowed))
+    except Exception:
+        pass
 
 
 @restricted
@@ -565,7 +568,15 @@ def start(update: Update, context: CallbackContext):
     context.user_data["menu_started"] = True
     message = update.effective_message
     if message:
-        message.reply_text("Начать")
+        chat_id = message.chat_id
+        try:
+            message.delete()
+        except Exception:
+            pass
+        try:
+            context.bot.send_message(chat_id=chat_id, text="Начать")
+        except Exception:
+            pass
     _send_main_menu(update, context, allowed)
 
 
