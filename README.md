@@ -1,6 +1,6 @@
 # esxi_bot
 
-Telegram-бот для управления виртуальными машинами во vCenter через pyVmomi и python-telegram-bot.
+Telegram-бот для управления виртуальными машинами в vCenter через pyVmomi и python-telegram-bot.
 
 ## Требования к VM
 
