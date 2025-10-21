@@ -27,6 +27,7 @@ from .state import (
     PENDING_CONFIRMS,
     PC_GUARD,
     SELECTED_VC,
+    consume_search_timeout,
     chat_ops_release,
     chat_ops_try_acquire,
     is_search_await,
@@ -620,8 +621,7 @@ def searchvm(update: Update, context: CallbackContext):
     def _search_timeout_job(context_job: CallbackContext) -> None:
         data = context_job.job.context
         ch, user = data["chat_id"], data["user_id"]
-        if is_search_await(ch, user):
-            set_search_await(ch, user, False)
+        if consume_search_timeout(ch, user):
             try:
                 context_job.bot.send_message(chat_id=ch, text="⏱ Время ожидания истекло. Повторите команду /searchvm.")
             except Exception:
@@ -653,3 +653,8 @@ def any_text_handler(update: Update, context: CallbackContext):
         update.message.reply_text(f"🔎 Ищу «{text}» во всех vCenter…")
         set_search_await(chat_id, uid, False)
         _perform_search_all_vc(update, text)
+        return
+
+    update.message.reply_text(
+        "Я понимаю только команды. Используйте меню или /listvc, /listvm, /searchvm, /whoami."
+    )

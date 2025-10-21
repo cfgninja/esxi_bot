@@ -18,6 +18,7 @@ __all__ = [
     "set_search_await",
     "is_search_await",
     "new_nonce",
+    "consume_search_timeout",
     "PENDING_CONFIRMS",
     "PC_GUARD",
     "SELECTED_VC",
@@ -88,3 +89,17 @@ def is_search_await(chat_id: int, user_id: int) -> bool:
 
 def new_nonce() -> str:
     return uuid.uuid4().hex[:10]
+
+
+def consume_search_timeout(chat_id: int, user_id: int) -> bool:
+    """Return True if pending search expired and clear it."""
+
+    key = (chat_id, user_id)
+    with SEARCH_AWAIT_GUARD:
+        exp = SEARCH_AWAIT.get(key)
+        if exp is None:
+            return False
+        if time.time() >= exp:
+            SEARCH_AWAIT.pop(key, None)
+            return True
+        return False
