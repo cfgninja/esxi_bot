@@ -44,7 +44,6 @@ from .telegram_ui import (
     confirm_keyboard,
     safe_edit_message,
     set_menu_for_chat,
-    start_keyboard,
     vm_action_keyboard,
     whoami_text,
 )
@@ -563,16 +562,11 @@ def start(update: Update, context: CallbackContext):
     allowed = bool(uid and uid in ALLOWED_USERS)
     set_menu_for_chat(context.bot, update.effective_chat.id, allowed=allowed)
     set_search_await(update.effective_chat.id, uid, False)
-    if context.user_data.get("menu_started"):
-        _send_main_menu(update, context, allowed)
-        return
-
+    context.user_data["menu_started"] = True
     message = update.effective_message
     if message:
-        message.reply_text(
-            "✅ Привет! Это бот управления vCenter.\nНажмите кнопку «▶️ Начать», чтобы продолжить.",
-            reply_markup=start_keyboard(),
-        )
+        message.reply_text("Начать")
+    _send_main_menu(update, context, allowed)
 
 
 @restricted
@@ -666,12 +660,6 @@ def any_text_handler(update: Update, context: CallbackContext):
     uid = update.effective_user.id if update.effective_user else None
     chat_id = update.effective_chat.id
     text = (update.message.text or "").strip()
-
-    if text == "▶️ Начать":
-        context.user_data["menu_started"] = True
-        allowed = bool(uid and uid in ALLOWED_USERS)
-        _send_main_menu(update, context, allowed)
-        return
 
     set_menu_for_chat(context.bot, chat_id, allowed=bool(uid and uid in ALLOWED_USERS))
     if uid not in ALLOWED_USERS:
