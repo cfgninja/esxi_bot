@@ -625,7 +625,7 @@ def searchvm(update: Update, context: CallbackContext):
             try:
                 context_job.bot.send_message(
                     chat_id=ch,
-                    text="⏱ Время ожидания истекло. Повторите команду кнопкой /searchvm.",
+                    text="⏱ Время ожидания истекло. Повторите действие кнопкой «🔍 Поиск ВМ».",
                     reply_markup=command_keyboard(user in ALLOWED_USERS),
                 )
             except Exception:
@@ -653,6 +653,26 @@ def any_text_handler(update: Update, context: CallbackContext):
             "⛔ У вас нет прав на использование этого бота.\nСвяжитесь с администратором для получения доступа.",
             reply_markup=command_keyboard(False),
         )
+        if text == "ℹ️ Мои права":
+            context.args = []
+            whoami(update, context)
+        return
+    button = text
+    if button == "📡 Выбрать vCenter":
+        context.args = []
+        listvc(update, context)
+        return
+    if button == "💻 Список ВМ":
+        context.args = []
+        listvm(update, context)
+        return
+    if button == "🔍 Поиск ВМ":
+        context.args = []
+        searchvm(update, context)
+        return
+    if button == "ℹ️ Мои права":
+        context.args = []
+        whoami(update, context)
         return
     if not text or text.startswith("/"):
         return

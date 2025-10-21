@@ -107,7 +107,7 @@ def whoami_text(user_id: Optional[int]) -> str:
 
 def command_keyboard(allowed: bool) -> ReplyKeyboardMarkup:
     if allowed:
-        rows = [["/listvc", "/listvm"], ["/searchvm", "/whoami"]]
+        rows = [["📡 Выбрать vCenter", "💻 Список ВМ"], ["🔍 Поиск ВМ", "ℹ️ Мои права"]]
     else:
-        rows = [["/whoami"]]
+        rows = [["ℹ️ Мои права"]]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
