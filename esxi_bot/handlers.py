@@ -287,8 +287,9 @@ def _do_power_action(q, context: CallbackContext, vcidx: int, vm_name: str, acti
         user = getattr(q, "from_user", None)
         verb = "включил" if action == "on" else "выключил"
         status = "успешно" if result else "не подтвердилось"
-        if path and path not in ("-", "?"):
-            status = f"{status} ({path})"
+        path_text = _humanize_path(path)
+        if path_text:
+            status = f"{status} ({path_text})"
         _audit_notify(context.bot, user, verb, vm_name, VCENTERS[vcidx]["name"], status)
     finally:
         try:
@@ -360,8 +361,9 @@ def _do_reboot_action(q, context: CallbackContext, vcidx: int, vm_name: str) -> 
             )
         user = getattr(q, "from_user", None)
         status = "успешно" if result else "не подтвердилось"
-        if path and path not in ("-", "?"):
-            status = f"{status} ({path})"
+        path_text = _humanize_path(path)
+        if path_text:
+            status = f"{status} ({path_text})"
         _audit_notify(context.bot, user, "перезагрузил", vm_name, VCENTERS[vcidx]["name"], status)
     finally:
         try:
@@ -392,6 +394,15 @@ def _format_user(user) -> str:
     if phone:
         return f"{name} — {phone}"
     return name
+
+
+def _humanize_path(path: str) -> str | None:
+    mapping = {
+        "soft": "штатно",
+        "hard": "принудительно",
+        "hard?": "принудительно, результат не подтверждён",
+    }
+    return mapping.get(path)
 
 
 def _audit_notify(bot, user, action_text: str, vm_name: str, vc_name: str, status: str) -> None:
