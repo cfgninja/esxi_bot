@@ -390,6 +390,7 @@ def _format_user(user) -> str:
         name = f"@{username}"
     if not name:
         name = "пользователь"
+    name = f"<b>{name}</b>"
     phone = USER_PHONES.get(user.id)
     if phone:
         return f"{name} — {phone}"
@@ -411,7 +412,8 @@ def _audit_notify(bot, user, action_text: str, vm_name: str, vc_name: str, statu
     try:
         bot.send_message(
             chat_id=AUDIT_CHANNEL_ID,
-            text=f"👤 {_format_user(user)} {action_text} {vm_name} ({vc_name}) — {status}.",
+            text=f"👤 {_format_user(user)} {action_text} <b>{vm_name}</b> ({vc_name}) — {status}.",
+            parse_mode="HTML",
         )
     except Exception:
         pass
