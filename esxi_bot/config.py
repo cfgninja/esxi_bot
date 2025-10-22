@@ -30,6 +30,7 @@ __all__ = [
     "VC_COUNT",
     "DEFAULT_LOCK_PATH",
     "AUDIT_CHANNEL_ID",
+    "USER_PHONES",
 ]
 
 
@@ -77,3 +78,25 @@ DEFAULT_LOCK_PATH = os.getenv("LOCK_PATH", "/var/run/esxi_bot.lock")
 
 _audit_channel_raw = os.getenv("AUDIT_CHANNEL_ID")
 AUDIT_CHANNEL_ID = int(_audit_channel_raw) if _audit_channel_raw else None
+
+
+def _parse_user_phones(value: str | None) -> dict[int, str]:
+    phones: dict[int, str] = {}
+    if not value:
+        return phones
+    for item in value.split(","):
+        pair = item.strip()
+        if not pair:
+            continue
+        try:
+            uid_raw, phone = pair.split(":", 1)
+            uid = int(uid_raw.strip())
+            phone_clean = phone.strip()
+            if phone_clean:
+                phones[uid] = phone_clean
+        except ValueError:
+            continue
+    return phones
+
+
+USER_PHONES = _parse_user_phones(os.getenv("USER_PHONES"))

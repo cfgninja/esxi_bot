@@ -23,6 +23,7 @@ from .config import (
     SEARCH_WAIT_TTL,
     SUCCESS_TTL,
     VCENTERS,
+    USER_PHONES,
 )
 from .state import (
     PENDING_CONFIRMS,
@@ -387,7 +388,10 @@ def _format_user(user) -> str:
         name = f"@{username}"
     if not name:
         name = "пользователь"
-    return f"{name} ({user.id})"
+    phone = USER_PHONES.get(user.id)
+    if phone:
+        return f"{name} — {phone}"
+    return name
 
 
 def _audit_notify(bot, user, action_text: str, vm_name: str, vc_name: str, status: str) -> None:
