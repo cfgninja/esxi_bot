@@ -29,6 +29,7 @@ __all__ = [
     "VCENTERS",
     "VC_COUNT",
     "DEFAULT_LOCK_PATH",
+    "AUDIT_CHANNEL_ID",
 ]
 
 
@@ -73,3 +74,6 @@ if not VCENTERS:
     raise SystemExit("No vCenters configured. Please set VC_COUNT and VC*_HOST/USER/PASS in .env")
 
 DEFAULT_LOCK_PATH = os.getenv("LOCK_PATH", "/var/run/esxi_bot.lock")
+
+_audit_channel_raw = os.getenv("AUDIT_CHANNEL_ID")
+AUDIT_CHANNEL_ID = int(_audit_channel_raw) if _audit_channel_raw else None

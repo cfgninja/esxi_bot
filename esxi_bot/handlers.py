@@ -10,6 +10,7 @@ from telegram import Update
 from telegram.ext import CallbackContext
 
 from .config import (
+    AUDIT_CHANNEL_ID,
     ALLOWED_USERS,
     CONFIRM_OFF,
     CONFIRM_ON,
@@ -282,6 +283,12 @@ def _do_power_action(q, context: CallbackContext, vcidx: int, vm_name: str, acti
                 base + f"\n\n❌ {vm_name}: не удалось подтвердить результат. Проверьте в vCenter.",
                 reply_markup=vm_action_keyboard(vm, vcidx),
             )
+        user = getattr(q, "from_user", None)
+        verb = "включил" if action == "on" else "выключил"
+        status = "успешно" if result else "не подтвердилось"
+        if path and path not in ("-", "?"):
+            status = f"{status} ({path})"
+        _audit_notify(context.bot, user, verb, vm_name, VCENTERS[vcidx]["name"], status)
     finally:
         try:
             lock.release()
@@ -350,6 +357,11 @@ def _do_reboot_action(q, context: CallbackContext, vcidx: int, vm_name: str) -> 
                 base + f"\n\n❌ {vm_name}: не удалось подтвердить перезагрузку. Проверьте в vCenter.",
                 reply_markup=vm_action_keyboard(vm, vcidx),
             )
+        user = getattr(q, "from_user", None)
+        status = "успешно" if result else "не подтвердилось"
+        if path and path not in ("-", "?"):
+            status = f"{status} ({path})"
+        _audit_notify(context.bot, user, "перезагрузил", vm_name, VCENTERS[vcidx]["name"], status)
     finally:
         try:
             lock.release()
@@ -362,6 +374,32 @@ def _do_reboot_action(q, context: CallbackContext, vcidx: int, vm_name: str) -> 
 def _restore_card_job(context: CallbackContext) -> None:
     data = context.job.context
     _restore_card(context.bot, data["chat_id"], data["message_id"], data["vcidx"], data["vm_name"])
+
+
+def _format_user(user) -> str:
+    if not user:
+        return "неизвестный пользователь"
+    name = (user.full_name or "").strip()
+    username = user.username
+    if name and username and username not in name:
+        name = f"{name} (@{username})"
+    elif not name and username:
+        name = f"@{username}"
+    if not name:
+        name = "пользователь"
+    return f"{name} ({user.id})"
+
+
+def _audit_notify(bot, user, action_text: str, vm_name: str, vc_name: str, status: str) -> None:
+    if AUDIT_CHANNEL_ID is None:
+        return
+    try:
+        bot.send_message(
+            chat_id=AUDIT_CHANNEL_ID,
+            text=f"👤 {_format_user(user)} {action_text} {vm_name} ({vc_name}) — {status}.",
+        )
+    except Exception:
+        pass
 
 
 def _cb_pre(update: Update, context: CallbackContext) -> None:
@@ -379,7 +417,7 @@ def _send_main_menu(update: Update, context: CallbackContext, allowed: bool) -> 
     else:
         text = (
             "✅ Привет! Это бот управления vCenter.\n"
-            "Нажмите «ℹ️ Мои права», чтобы узнать свой ID и запросить доступ."
+            "Нажмите «ℹ️ Мой доступ», чтобы узнать свой ID и запросить доступ."
         )
     try:
         context.bot.send_message(chat_id=chat.id, text=text, reply_markup=command_keyboard(allowed))
