@@ -115,16 +115,23 @@ class VCEventListener:
         if user_name.lower() in self._ignore_users:
             return
         details = self._event_details(event)
-        if not details:
-            return
-        verb, vm_name = details
-        vc_label = f"{self.config['name']} ({self.config['host']})"
-        status = "успешно (vCenter)"
-        vm_part = html.escape(vm_name) if vm_name else "ресурс"
-        text = (
-            f"👤 <b>{html.escape(user_name)}</b> {verb} <b>{vm_part}</b> "
-            f"({html.escape(vc_label)}) — {status}."
-        )
+        if details:
+            verb, vm_name = details
+            vc_label = f"{self.config['name']} ({self.config['host']})"
+            status = "успешно (vCenter)"
+            vm_part = html.escape(vm_name) if vm_name else "ресурс"
+            text = (
+                f"👤 <b>{html.escape(user_name)}</b> {verb} <b>{vm_part}</b> "
+                f"({html.escape(vc_label)}) — {status}."
+            )
+        else:
+            raw = getattr(event, "fullFormattedMessage", "") or type(event).__name__
+            vm_name = getattr(getattr(event, "vm", None), "name", "")
+            vm_part = f" ВМ: <b>{html.escape(vm_name)}</b>" if vm_name else ""
+            text = (
+                f"🛰️ <b>{html.escape(self.config['name'])}</b> — "
+                f"👤 <b>{html.escape(user_name)}</b>{vm_part} — {html.escape(raw)}"
+            )
         self._send(text)
 
     def _event_details(self, event) -> Optional[Tuple[str, str]]:
