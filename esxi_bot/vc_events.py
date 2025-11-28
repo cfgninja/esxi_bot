@@ -6,7 +6,7 @@ import html
 import logging
 import threading
 import time
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from pyVmomi import vim
 
@@ -22,83 +22,56 @@ from .vcenter import Disconnect, vcenter_connect
 
 log = logging.getLogger(__name__)
 
-EVENT_VERB_MAP = {
-    "VmPoweredOnEvent": "включил",
-    "VmPoweredOffEvent": "выключил",
-    "VmRebootingEvent": "перезагрузил",
-    "VmGuestRebootEvent": "перезагрузил",
-    "VmGuestShutdownEvent": "выключил",
-    "DrsVmPoweredOnEvent": "включил",
-    "VmSuspendedEvent": "приостановил",
-    "VmResumedEvent": "возобновил",
-    "VmResettingEvent": "перезагрузил",
-    "VmMigratedEvent": "переместил",
-    "VmRelocatedEvent": "переместил",
-    "VmBeingClonedEvent": "клонирует",
-    "VmClonedEvent": "клонировал",
-    "VmCreatedEvent": "создал",
-    "VmRegisteredEvent": "зарегистрировал",
-    "VmUnregisteredEvent": "удалил из инвентаря",
-    "VmRemovedEvent": "удалил",
-    "VmBeingDeployedEvent": "разворачивает",
-    "VmDeployedEvent": "развернул",
-    "VmBeingSuspendedEvent": "приостанавливает",
+CORE_TASK_IDS = {
+    "VirtualMachine.powerOn",
+    "VirtualMachine.powerOff",
+    "VirtualMachine.rebootGuest",
+    "VirtualMachine.reset",
+    "VirtualMachine.shutdownGuest",
+    "VirtualMachine.suspend",
+    "VirtualMachine.standbyGuest",
+    "VirtualMachine.create",
+    "VirtualMachine.clone",
+    "VirtualMachine.createFromExisting",
+    "VirtualMachine.destroy",
+    "VirtualMachine.register",
+    "VirtualMachine.unregister",
+    "VirtualMachine.relocate",
+    "VirtualMachine.migrate",
+    "VirtualMachine.reconfigure",
+    "VirtualMachine.createSnapshot",
+    "VirtualMachine.removeSnapshot",
+    "VirtualMachine.removeAllSnapshots",
+    "VirtualMachine.revertToCurrentSnapshot",
+    "VirtualMachine.consolidateDisks",
+    "VirtualMachine.deploy",
 }
 
-TASK_VERB_MAP = {
-    "VirtualMachine.powerOn": "включил",
-    "VirtualMachine.powerOff": "выключил",
-    "VirtualMachine.rebootGuest": "перезагрузил",
-    "VirtualMachine.reset": "перезагрузил",
-    "VirtualMachine.shutdownGuest": "выключил",
-    "VirtualMachine.suspend": "приостановил",
-    "VirtualMachine.standbyGuest": "перевёл в ожидание",
-    "VirtualMachine.createSnapshot": "создал снепшот",
-    "VirtualMachine.removeAllSnapshots": "удалил все снепшоты",
-    "VirtualMachine.removeSnapshot": "удалил снепшот",
-    "VirtualMachine.revertToCurrentSnapshot": "откатил снепшот",
-    "VirtualMachine.consolidateDisks": "консолидировал диски",
-    "VirtualMachine.relocate": "переместил",
-    "VirtualMachine.migrate": "мигрировал",
-    "VirtualMachine.clone": "клонировал",
-    "VirtualMachine.register": "зарегистрировал",
-    "VirtualMachine.unregister": "удалил из инвентаря",
-    "VirtualMachine.destroy": "удалил",
-    "VirtualMachine.reconfigure": "изменил настройки",
-}
-
-TASK_NAME_VERB_MAP = {
-    "Power On virtual machine": "включил",
-    "Power Off virtual machine": "выключил",
-    "Reset virtual machine": "перезагрузил",
-    "Reboot Guest OS": "перезагрузил",
-    "Shutdown guest OS": "выключил",
-    "Suspend virtual machine": "приостановил",
-    "Standby Guest OS": "перевёл в ожидание",
-    "Create virtual machine snapshot": "создал снепшот",
-    "Remove snapshot": "удалил снепшот",
-    "Remove all snapshots": "удалил все снепшоты",
-    "Revert virtual machine to snapshot": "откатил снепшот",
-    "Consolidate virtual machine disks": "консолидировал диски",
-    "Relocate virtual machine": "переместил",
-    "Migrate virtual machine": "мигрировал",
-    "Clone virtual machine": "клонировал",
-    "Deploy template": "развернул шаблон",
-    "Register virtual machine": "зарегистрировал",
-    "Unregister virtual machine": "удалил из инвентаря",
-    "Delete virtual machine": "удалил",
-    "Destroy virtual machine": "удалил",
-    "Reconfigure virtual machine": "изменил настройки",
-}
-
-TASK_GENERIC_TRANSLATIONS = {
-    "Download patch definitions": "загрузил определения патчей",
-    "Scheduled hardware compatibility check": "запланировал проверку аппаратной совместимости",
-    "Initialize powering On": "инициализировал включение",
-    "Initialize powering Off": "инициализировал выключение",
-    "Apply recommendation": "применил рекомендацию",
-    "Apply DRS recommendation": "применил рекомендацию DRS",
-    "Apply recommendation for cluster": "применил рекомендацию для кластера",
+CORE_TASK_NAMES = {
+    "Power On virtual machine",
+    "Power Off virtual machine",
+    "Initialize powering On",
+    "Initialize powering Off",
+    "Reset virtual machine",
+    "Reboot Guest OS",
+    "Shutdown guest OS",
+    "Suspend virtual machine",
+    "Standby Guest OS",
+    "Create virtual machine",
+    "Delete virtual machine",
+    "Destroy virtual machine",
+    "Clone virtual machine",
+    "Deploy template",
+    "Register virtual machine",
+    "Unregister virtual machine",
+    "Relocate virtual machine",
+    "Migrate virtual machine",
+    "Reconfigure virtual machine",
+    "Create virtual machine snapshot",
+    "Remove snapshot",
+    "Remove all snapshots",
+    "Revert virtual machine to snapshot",
+    "Consolidate virtual machine disks",
 }
 
 
@@ -176,93 +149,61 @@ class VCEventListener:
         user_name = (getattr(event, "userName", "") or "System").strip()
         if user_name.lower() in self._ignore_users:
             return
-        details = self._event_details(event)
-        if details:
-            verb, vm_name = details
-            vc_label = f"{self.config['name']} ({self.config['host']})"
-            status = "успешно (vCenter)"
-            vm_part = html.escape(vm_name) if vm_name else "ресурс"
-            text = (
-                f"👤 <b>{html.escape(user_name)}</b> {verb} <b>{vm_part}</b> "
-                f"({html.escape(vc_label)}) — {status}."
-            )
-        else:
-            generic_text = self._generic_task_text(event, user_name)
-            if generic_text:
-                text = generic_text
-            else:
-                raw = getattr(event, "fullFormattedMessage", "") or type(event).__name__
-                vm_name = getattr(getattr(event, "vm", None), "name", "")
-                vm_part = f" ВМ: <b>{html.escape(vm_name)}</b>" if vm_name else ""
-                text = (
-                    f"🛰️ <b>{html.escape(self.config['name'])}</b> — "
-                    f"👤 <b>{html.escape(user_name)}</b>{vm_part} — {html.escape(raw)}"
-                )
+        if not self._should_emit_event(event):
+            return
+        text = self._format_event_text(event, user_name)
         self._send(text)
 
-    def _event_details(self, event) -> Optional[Tuple[str, str]]:
-        event_type = type(event).__name__
-        vm_name = getattr(getattr(event, "vm", None), "name", "")
-        verb = EVENT_VERB_MAP.get(event_type)
-        if event_type == "TaskEvent":
-            info = getattr(event, "info", None)
-            desc = getattr(info, "descriptionId", "") or ""
-            vm_name = vm_name or getattr(info, "entityName", "")
-            verb = TASK_VERB_MAP.get(desc)
-            if not verb and desc:
-                desc_suffix = desc.split(".")[-1]
-                verb = TASK_VERB_MAP.get(desc_suffix)
-            if not verb and info is not None:
-                task_name = (getattr(info, "name", "") or "").strip()
-                verb = TASK_NAME_VERB_MAP.get(task_name)
-                if not verb:
-                    localized = getattr(getattr(info, "description", None), "message", "") or ""
-                    verb = TASK_NAME_VERB_MAP.get(localized)
-            if not verb:
-                raw = getattr(event, "fullFormattedMessage", "") or ""
-                if raw.startswith("Task:"):
-                    _, _, raw_name = raw.partition(":")
-                    verb = TASK_NAME_VERB_MAP.get(raw_name.strip())
-        if not verb:
-            return None
-        if not vm_name:
-            vm_name = getattr(getattr(event, "info", None), "entityName", "")
-        return verb, vm_name
-
-    def _generic_task_text(self, event, user_name: str) -> Optional[str]:
+    def _should_emit_event(self, event) -> bool:
         if type(event).__name__ != "TaskEvent":
-            return None
+            return True
         info = getattr(event, "info", None)
         if info is None:
-            return None
-        candidates = []
-        for attr in ("name",):
-            value = getattr(info, attr, None)
-            if value:
-                candidates.append(value.strip())
-        desc_msg = getattr(getattr(info, "description", None), "message", None)
-        if desc_msg:
-            candidates.append(desc_msg.strip())
+            return False
+        desc = getattr(info, "descriptionId", "") or ""
+        if desc and self._match_core_task_id(desc):
+            return True
+        name = (getattr(info, "name", "") or "").strip()
+        if name and name in CORE_TASK_NAMES:
+            return True
+        desc_msg = getattr(getattr(info, "description", None), "message", "") or ""
+        if desc_msg and desc_msg in CORE_TASK_NAMES:
+            return True
         raw = getattr(event, "fullFormattedMessage", "")
         if raw.startswith("Task:"):
             _, _, rest = raw.partition(":")
-            if rest:
-                candidates.append(rest.strip())
-        entity_name = (
-            getattr(info, "entityName", "")
-            or getattr(getattr(event, "vm", None), "name", "")
-            or getattr(getattr(event, "host", None), "name", "")
-        )
+            candidate = rest.strip()
+            if candidate in CORE_TASK_NAMES:
+                return True
+        return False
+
+    def _match_core_task_id(self, desc: str) -> bool:
+        if desc in CORE_TASK_IDS:
+            return True
+        suffix = desc.split(".")[-1]
+        return suffix in CORE_TASK_IDS
+
+    def _format_event_text(self, event, user_name: str) -> str:
         vc_label = f"{self.config['name']} ({self.config['host']})"
-        for key in candidates:
-            translation = TASK_GENERIC_TRANSLATIONS.get(key)
-            if translation:
-                entity_part = f" для <b>{html.escape(entity_name)}</b>" if entity_name else ""
-                return (
-                    f"🛰️ <b>{html.escape(vc_label)}</b> — "
-                    f"👤 <b>{html.escape(user_name)}</b> {translation}{entity_part}."
-                )
-        return None
+        raw = getattr(event, "fullFormattedMessage", "") or type(event).__name__
+        vm_name = self._event_entity_name(event)
+        parts = [f"🛰️ <b>{html.escape(vc_label)}</b>", f"👤 <b>{html.escape(user_name)}</b>"]
+        if vm_name:
+            parts.append(f"VM: <b>{html.escape(vm_name)}</b>")
+        parts.append(html.escape(raw))
+        return " — ".join(parts)
+
+    def _event_entity_name(self, event) -> str:
+        vm_name = getattr(getattr(event, "vm", None), "name", "")
+        if vm_name:
+            return vm_name
+        info = getattr(event, "info", None)
+        if info:
+            entity = getattr(info, "entityName", "")
+            if entity:
+                return entity
+        host_name = getattr(getattr(event, "host", None), "name", "")
+        return host_name
 
     def _send(self, text: str) -> None:
         if not AUDIT_CHANNEL_ID:
