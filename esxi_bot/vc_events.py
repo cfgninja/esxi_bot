@@ -91,6 +91,16 @@ TASK_NAME_VERB_MAP = {
     "Reconfigure virtual machine": "изменил настройки",
 }
 
+TASK_GENERIC_TRANSLATIONS = {
+    "Download patch definitions": "загрузил определения патчей",
+    "Scheduled hardware compatibility check": "запланировал проверку аппаратной совместимости",
+    "Initialize powering On": "инициализировал включение",
+    "Initialize powering Off": "инициализировал выключение",
+    "Apply recommendation": "применил рекомендацию",
+    "Apply DRS recommendation": "применил рекомендацию DRS",
+    "Apply recommendation for cluster": "применил рекомендацию для кластера",
+}
+
 
 class VCEventListener:
     def __init__(self, bot, idx: int):
@@ -177,14 +187,51 @@ class VCEventListener:
                 f"({html.escape(vc_label)}) — {status}."
             )
         else:
-            raw = getattr(event, "fullFormattedMessage", "") or type(event).__name__
-            vm_name = getattr(getattr(event, "vm", None), "name", "")
-            vm_part = f" ВМ: <b>{html.escape(vm_name)}</b>" if vm_name else ""
-            text = (
-                f"🛰️ <b>{html.escape(self.config['name'])}</b> — "
-                f"👤 <b>{html.escape(user_name)}</b>{vm_part} — {html.escape(raw)}"
-            )
+            generic_text = self._generic_task_text(event, user_name)
+            if generic_text:
+                text = generic_text
+            else:
+                raw = getattr(event, "fullFormattedMessage", "") or type(event).__name__
+                vm_name = getattr(getattr(event, "vm", None), "name", "")
+                vm_part = f" ВМ: <b>{html.escape(vm_name)}</b>" if vm_name else ""
+                text = (
+                    f"🛰️ <b>{html.escape(self.config['name'])}</b> — "
+                    f"👤 <b>{html.escape(user_name)}</b>{vm_part} — {html.escape(raw)}"
+                )
         self._send(text)
+        if type(event).__name__ != "TaskEvent":
+            return None
+        info = getattr(event, "info", None)
+        if info is None:
+            return None
+        candidates = []
+        for attr in ("name",):
+            value = getattr(info, attr, None)
+            if value:
+                candidates.append(value.strip())
+        desc_msg = getattr(getattr(info, "description", None), "message", None)
+        if desc_msg:
+            candidates.append(desc_msg.strip())
+        raw = getattr(event, "fullFormattedMessage", "")
+        if raw.startswith("Task:"):
+            _, _, rest = raw.partition(":")
+            if rest:
+                candidates.append(rest.strip())
+        entity_name = (
+            getattr(info, "entityName", "")
+            or getattr(getattr(event, "vm", None), "name", "")
+            or getattr(getattr(event, "host", None), "name", "")
+        )
+        vc_label = f"{self.config['name']} ({self.config['host']})"
+        for key in candidates:
+            translation = TASK_GENERIC_TRANSLATIONS.get(key)
+            if translation:
+                entity_part = f" для <b>{html.escape(entity_name)}</b>" if entity_name else ""
+                return (
+                    f"🛰️ <b>{html.escape(vc_label)}</b> — "
+                    f"👤 <b>{html.escape(user_name)}</b> {translation}{entity_part}."
+                )
+        return None
 
     def _event_details(self, event) -> Optional[Tuple[str, str]]:
         event_type = type(event).__name__
