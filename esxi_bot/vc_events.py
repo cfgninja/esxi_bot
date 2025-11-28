@@ -29,6 +29,20 @@ EVENT_VERB_MAP = {
     "VmGuestRebootEvent": "перезагрузил",
     "VmGuestShutdownEvent": "выключил",
     "DrsVmPoweredOnEvent": "включил",
+    "VmSuspendedEvent": "приостановил",
+    "VmResumedEvent": "возобновил",
+    "VmResettingEvent": "перезагрузил",
+    "VmMigratedEvent": "переместил",
+    "VmRelocatedEvent": "переместил",
+    "VmBeingClonedEvent": "клонирует",
+    "VmClonedEvent": "клонировал",
+    "VmCreatedEvent": "создал",
+    "VmRegisteredEvent": "зарегистрировал",
+    "VmUnregisteredEvent": "удалил из инвентаря",
+    "VmRemovedEvent": "удалил",
+    "VmBeingDeployedEvent": "разворачивает",
+    "VmDeployedEvent": "развернул",
+    "VmBeingSuspendedEvent": "приостанавливает",
 }
 
 TASK_VERB_MAP = {
@@ -37,6 +51,44 @@ TASK_VERB_MAP = {
     "VirtualMachine.rebootGuest": "перезагрузил",
     "VirtualMachine.reset": "перезагрузил",
     "VirtualMachine.shutdownGuest": "выключил",
+    "VirtualMachine.suspend": "приостановил",
+    "VirtualMachine.standbyGuest": "перевёл в ожидание",
+    "VirtualMachine.createSnapshot": "создал снепшот",
+    "VirtualMachine.removeAllSnapshots": "удалил все снепшоты",
+    "VirtualMachine.removeSnapshot": "удалил снепшот",
+    "VirtualMachine.revertToCurrentSnapshot": "откатил снепшот",
+    "VirtualMachine.consolidateDisks": "консолидировал диски",
+    "VirtualMachine.relocate": "переместил",
+    "VirtualMachine.migrate": "мигрировал",
+    "VirtualMachine.clone": "клонировал",
+    "VirtualMachine.register": "зарегистрировал",
+    "VirtualMachine.unregister": "удалил из инвентаря",
+    "VirtualMachine.destroy": "удалил",
+    "VirtualMachine.reconfigure": "изменил настройки",
+}
+
+TASK_NAME_VERB_MAP = {
+    "Power On virtual machine": "включил",
+    "Power Off virtual machine": "выключил",
+    "Reset virtual machine": "перезагрузил",
+    "Reboot Guest OS": "перезагрузил",
+    "Shutdown guest OS": "выключил",
+    "Suspend virtual machine": "приостановил",
+    "Standby Guest OS": "перевёл в ожидание",
+    "Create virtual machine snapshot": "создал снепшот",
+    "Remove snapshot": "удалил снепшот",
+    "Remove all snapshots": "удалил все снепшоты",
+    "Revert virtual machine to snapshot": "откатил снепшот",
+    "Consolidate virtual machine disks": "консолидировал диски",
+    "Relocate virtual machine": "переместил",
+    "Migrate virtual machine": "мигрировал",
+    "Clone virtual machine": "клонировал",
+    "Deploy template": "развернул шаблон",
+    "Register virtual machine": "зарегистрировал",
+    "Unregister virtual machine": "удалил из инвентаря",
+    "Delete virtual machine": "удалил",
+    "Destroy virtual machine": "удалил",
+    "Reconfigure virtual machine": "изменил настройки",
 }
 
 
@@ -140,9 +192,18 @@ class VCEventListener:
         verb = EVENT_VERB_MAP.get(event_type)
         if event_type == "TaskEvent":
             info = getattr(event, "info", None)
-            desc = getattr(info, "descriptionId", "")
+            desc = getattr(info, "descriptionId", "") or ""
             vm_name = vm_name or getattr(info, "entityName", "")
             verb = TASK_VERB_MAP.get(desc)
+            if not verb and desc:
+                desc_suffix = desc.split(".")[-1]
+                verb = TASK_VERB_MAP.get(desc_suffix)
+            if not verb and info is not None:
+                task_name = (getattr(info, "name", "") or "").strip()
+                verb = TASK_NAME_VERB_MAP.get(task_name)
+                if not verb:
+                    localized = getattr(getattr(info, "description", None), "message", "") or ""
+                    verb = TASK_NAME_VERB_MAP.get(localized)
         if not verb:
             return None
         if not vm_name:
