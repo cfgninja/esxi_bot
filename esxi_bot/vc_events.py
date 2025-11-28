@@ -218,6 +218,11 @@ class VCEventListener:
                 if not verb:
                     localized = getattr(getattr(info, "description", None), "message", "") or ""
                     verb = TASK_NAME_VERB_MAP.get(localized)
+            if not verb:
+                raw = getattr(event, "fullFormattedMessage", "") or ""
+                if raw.startswith("Task:"):
+                    _, _, raw_name = raw.partition(":")
+                    verb = TASK_NAME_VERB_MAP.get(raw_name.strip())
         if not verb:
             return None
         if not vm_name:
