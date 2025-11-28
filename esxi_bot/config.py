@@ -31,6 +31,10 @@ __all__ = [
     "DEFAULT_LOCK_PATH",
     "AUDIT_CHANNEL_ID",
     "USER_PHONES",
+    "VC_EVENT_TYPES",
+    "VC_EVENT_POLL_INTERVAL",
+    "VC_EVENT_BATCH_SIZE",
+    "VC_EVENT_USER_IGNORE",
 ]
 
 
@@ -100,3 +104,8 @@ def _parse_user_phones(value: str | None) -> dict[int, str]:
 
 
 USER_PHONES = _parse_user_phones(os.getenv("USER_PHONES"))
+
+VC_EVENT_TYPES = tuple(_split_csv(os.getenv("VC_EVENT_TYPES")))
+VC_EVENT_POLL_INTERVAL = int(os.getenv("VC_EVENT_POLL_INTERVAL", "10"))
+VC_EVENT_BATCH_SIZE = int(os.getenv("VC_EVENT_BATCH_SIZE", "50"))
+VC_EVENT_USER_IGNORE = set(_split_csv(os.getenv("VC_EVENT_USER_IGNORE")))

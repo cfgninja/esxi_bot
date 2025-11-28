@@ -25,6 +25,7 @@ from .handlers import (
     whoami,
 )
 from .singleton import ensure_single_instance
+from .vc_events import start_listeners, stop_listeners
 
 log = logging.getLogger("esxi_bot")
 
@@ -71,5 +72,9 @@ def run() -> None:
     except Exception:
         log.debug("Failed to set default bot commands", exc_info=True)
 
-    updater.start_polling()
-    updater.idle()
+    listeners = start_listeners(updater.bot)
+    try:
+        updater.start_polling()
+        updater.idle()
+    finally:
+        stop_listeners(listeners)

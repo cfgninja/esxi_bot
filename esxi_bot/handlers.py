@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 import time
 from typing import Callable, Optional
@@ -228,12 +229,14 @@ def _do_power_action(q, context: CallbackContext, vcidx: int, vm_name: str, acti
         q.answer("Слишком много операций сразу. Подождите и попробуйте ещё раз.", show_alert=True)
         return
 
+    verb = "включил" if action == "on" else "выключил"
     si = vcenter_connect(vcidx)
     try:
         content = si.RetrieveContent()
         vm = find_vm(content, vm_name)
         if not vm:
             safe_edit_message(q, f"• {vm_name} (недоступна)")
+            _audit_notify(context.bot, getattr(q, "from_user", None), verb, vm_name, VCENTERS[vcidx]["name"], "недоступна")
             return
 
         base = build_base_text(vm, vcidx)
@@ -285,7 +288,6 @@ def _do_power_action(q, context: CallbackContext, vcidx: int, vm_name: str, acti
                 reply_markup=vm_action_keyboard(vm, vcidx),
             )
         user = getattr(q, "from_user", None)
-        verb = "включил" if action == "on" else "выключил"
         status = "успешно" if result else "не подтвердилось"
         path_text = _humanize_path(path)
         if path_text:
@@ -317,6 +319,7 @@ def _do_reboot_action(q, context: CallbackContext, vcidx: int, vm_name: str) -> 
         vm = find_vm(content, vm_name)
         if not vm:
             safe_edit_message(q, f"• {vm_name} (недоступна)")
+            _audit_notify(context.bot, getattr(q, "from_user", None), "перезагрузил", vm_name, VCENTERS[vcidx]["name"], "недоступна")
             return
 
         base = build_base_text(vm, vcidx)
@@ -381,7 +384,7 @@ def _restore_card_job(context: CallbackContext) -> None:
 
 def _format_user(user) -> str:
     if not user:
-        return "неизвестный пользователь"
+        return "<b>неизвестный пользователь</b>"
     name = (user.full_name or "").strip()
     username = user.username
     if name and username and username not in name:
@@ -390,11 +393,20 @@ def _format_user(user) -> str:
         name = f"@{username}"
     if not name:
         name = "пользователь"
-    name = f"<b>{name}</b>"
+    safe_name = html.escape(name)
     phone = USER_PHONES.get(user.id)
     if phone:
-        return f"{name} — {phone}"
-    return name
+        return f"<b>{safe_name}</b> — {html.escape(phone)}"
+    return f"<b>{safe_name}</b>"
+
+
+def _audit_send(bot, text: str) -> None:
+    if AUDIT_CHANNEL_ID is None or bot is None:
+        return
+    try:
+        bot.send_message(chat_id=AUDIT_CHANNEL_ID, text=text, parse_mode="HTML")
+    except Exception:
+        pass
 
 
 def _humanize_path(path: str) -> str | None:
@@ -407,16 +419,11 @@ def _humanize_path(path: str) -> str | None:
 
 
 def _audit_notify(bot, user, action_text: str, vm_name: str, vc_name: str, status: str) -> None:
-    if AUDIT_CHANNEL_ID is None:
-        return
-    try:
-        bot.send_message(
-            chat_id=AUDIT_CHANNEL_ID,
-            text=f"👤 {_format_user(user)} {action_text} <b>{vm_name}</b> ({vc_name}) — {status}.",
-            parse_mode="HTML",
-        )
-    except Exception:
-        pass
+    action = html.escape(action_text)
+    vm = f"<b>{html.escape(vm_name)}</b>"
+    vc = html.escape(vc_name)
+    status_safe = html.escape(status)
+    _audit_send(bot, f"👤 {_format_user(user)} {action} {vm} ({vc}) — {status_safe}.")
 
 
 def _cb_pre(update: Update, context: CallbackContext) -> None:
@@ -662,10 +669,11 @@ def listvm(update: Update, context: CallbackContext):
     try:
         content = si.RetrieveContent()
         vms = get_all_vms(content)
+        vc_name = VCENTERS[vcidx]['name']
         if not vms:
-            update.message.reply_text(f"💻 Список ВМ ({VCENTERS[vcidx]['name']}): пуст.")
+            update.message.reply_text(f"💻 Список ВМ ({vc_name}): пуст.")
             return
-        update.message.reply_text(f"💻 Список ВМ ({VCENTERS[vcidx]['name']}):")
+        update.message.reply_text(f"💻 Список ВМ ({vc_name}):")
         for vm in vms:
             update.message.reply_text(build_base_text(vm, vcidx), reply_markup=vm_action_keyboard(vm, vcidx))
     finally:
