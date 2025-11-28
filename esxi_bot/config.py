@@ -105,7 +105,19 @@ def _parse_user_phones(value: str | None) -> dict[int, str]:
 
 USER_PHONES = _parse_user_phones(os.getenv("USER_PHONES"))
 
-VC_EVENT_TYPES = tuple(_split_csv(os.getenv("VC_EVENT_TYPES")))
+_DEFAULT_VC_EVENT_TYPES = (
+    "VmPoweredOnEvent",
+    "VmPoweredOffEvent",
+    "VmRebootingEvent",
+    "VmGuestShutdownEvent",
+    "VmGuestRebootEvent",
+    "TaskEvent",
+)
+_raw_event_types = _split_csv(os.getenv("VC_EVENT_TYPES"))
+_event_types = list(_raw_event_types or _DEFAULT_VC_EVENT_TYPES)
+if "TaskEvent" not in _event_types:
+    _event_types.append("TaskEvent")
+VC_EVENT_TYPES = tuple(dict.fromkeys(_event_types))
 VC_EVENT_POLL_INTERVAL = int(os.getenv("VC_EVENT_POLL_INTERVAL", "10"))
 VC_EVENT_BATCH_SIZE = int(os.getenv("VC_EVENT_BATCH_SIZE", "50"))
 VC_EVENT_USER_IGNORE = set(_split_csv(os.getenv("VC_EVENT_USER_IGNORE")))

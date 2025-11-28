@@ -6,7 +6,7 @@ import html
 import logging
 import threading
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from pyVmomi import vim
 
@@ -21,6 +21,23 @@ from .config import (
 from .vcenter import Disconnect, vcenter_connect
 
 log = logging.getLogger(__name__)
+
+EVENT_VERB_MAP = {
+    "VmPoweredOnEvent": "включил",
+    "VmPoweredOffEvent": "выключил",
+    "VmRebootingEvent": "перезагрузил",
+    "VmGuestRebootEvent": "перезагрузил",
+    "VmGuestShutdownEvent": "выключил",
+    "DrsVmPoweredOnEvent": "включил",
+}
+
+TASK_VERB_MAP = {
+    "VirtualMachine.powerOn": "включил",
+    "VirtualMachine.powerOff": "выключил",
+    "VirtualMachine.rebootGuest": "перезагрузил",
+    "VirtualMachine.reset": "перезагрузил",
+    "VirtualMachine.shutdownGuest": "выключил",
+}
 
 
 class VCEventListener:
@@ -94,21 +111,36 @@ class VCEventListener:
                 pass
 
     def _handle_event(self, event) -> None:
-        user_name = (getattr(event, "userName", "") or "system").strip()
+        user_name = (getattr(event, "userName", "") or "System").strip()
         if user_name.lower() in self._ignore_users:
             return
-        vm_name = getattr(getattr(event, "vm", None), "name", "")
-        action = getattr(event, "fullFormattedMessage", "") or type(event).__name__
-        message = self._format_message(user_name, vm_name, action)
-        self._send(message)
+        details = self._event_details(event)
+        if not details:
+            return
+        verb, vm_name = details
+        vc_label = f"{self.config['name']} ({self.config['host']})"
+        status = "успешно (vCenter)"
+        vm_part = html.escape(vm_name) if vm_name else "ресурс"
+        text = (
+            f"👤 <b>{html.escape(user_name)}</b> {verb} <b>{vm_part}</b> "
+            f"({html.escape(vc_label)}) — {status}."
+        )
+        self._send(text)
 
-    def _format_message(self, user: str, vm_name: str, action: str) -> str:
-        parts = [f"🛰️ <b>{html.escape(self.config['name'])}</b>"]
-        parts.append(f"👤 <b>{html.escape(user)}</b>")
-        if vm_name:
-            parts.append(f"ВМ: <b>{html.escape(vm_name)}</b>")
-        parts.append(html.escape(action))
-        return " — ".join(parts)
+    def _event_details(self, event) -> Optional[Tuple[str, str]]:
+        event_type = type(event).__name__
+        vm_name = getattr(getattr(event, "vm", None), "name", "")
+        verb = EVENT_VERB_MAP.get(event_type)
+        if event_type == "TaskEvent":
+            info = getattr(event, "info", None)
+            desc = getattr(info, "descriptionId", "")
+            vm_name = vm_name or getattr(info, "entityName", "")
+            verb = TASK_VERB_MAP.get(desc)
+        if not verb:
+            return None
+        if not vm_name:
+            vm_name = getattr(getattr(event, "info", None), "entityName", "")
+        return verb, vm_name
 
     def _send(self, text: str) -> None:
         if not AUDIT_CHANNEL_ID:
