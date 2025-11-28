@@ -199,6 +199,32 @@ class VCEventListener:
                     f"👤 <b>{html.escape(user_name)}</b>{vm_part} — {html.escape(raw)}"
                 )
         self._send(text)
+
+    def _event_details(self, event) -> Optional[Tuple[str, str]]:
+        event_type = type(event).__name__
+        vm_name = getattr(getattr(event, "vm", None), "name", "")
+        verb = EVENT_VERB_MAP.get(event_type)
+        if event_type == "TaskEvent":
+            info = getattr(event, "info", None)
+            desc = getattr(info, "descriptionId", "") or ""
+            vm_name = vm_name or getattr(info, "entityName", "")
+            verb = TASK_VERB_MAP.get(desc)
+            if not verb and desc:
+                desc_suffix = desc.split(".")[-1]
+                verb = TASK_VERB_MAP.get(desc_suffix)
+            if not verb and info is not None:
+                task_name = (getattr(info, "name", "") or "").strip()
+                verb = TASK_NAME_VERB_MAP.get(task_name)
+                if not verb:
+                    localized = getattr(getattr(info, "description", None), "message", "") or ""
+                    verb = TASK_NAME_VERB_MAP.get(localized)
+        if not verb:
+            return None
+        if not vm_name:
+            vm_name = getattr(getattr(event, "info", None), "entityName", "")
+        return verb, vm_name
+
+    def _generic_task_text(self, event, user_name: str) -> Optional[str]:
         if type(event).__name__ != "TaskEvent":
             return None
         info = getattr(event, "info", None)
@@ -232,30 +258,6 @@ class VCEventListener:
                     f"👤 <b>{html.escape(user_name)}</b> {translation}{entity_part}."
                 )
         return None
-
-    def _event_details(self, event) -> Optional[Tuple[str, str]]:
-        event_type = type(event).__name__
-        vm_name = getattr(getattr(event, "vm", None), "name", "")
-        verb = EVENT_VERB_MAP.get(event_type)
-        if event_type == "TaskEvent":
-            info = getattr(event, "info", None)
-            desc = getattr(info, "descriptionId", "") or ""
-            vm_name = vm_name or getattr(info, "entityName", "")
-            verb = TASK_VERB_MAP.get(desc)
-            if not verb and desc:
-                desc_suffix = desc.split(".")[-1]
-                verb = TASK_VERB_MAP.get(desc_suffix)
-            if not verb and info is not None:
-                task_name = (getattr(info, "name", "") or "").strip()
-                verb = TASK_NAME_VERB_MAP.get(task_name)
-                if not verb:
-                    localized = getattr(getattr(info, "description", None), "message", "") or ""
-                    verb = TASK_NAME_VERB_MAP.get(localized)
-        if not verb:
-            return None
-        if not vm_name:
-            vm_name = getattr(getattr(event, "info", None), "entityName", "")
-        return verb, vm_name
 
     def _send(self, text: str) -> None:
         if not AUDIT_CHANNEL_ID:
