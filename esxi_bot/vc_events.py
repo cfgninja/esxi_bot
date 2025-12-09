@@ -28,8 +28,6 @@ CORE_TASK_IDS = {
     "VirtualMachine.rebootGuest",
     "VirtualMachine.reset",
     "VirtualMachine.shutdownGuest",
-    "VirtualMachine.suspend",
-    "VirtualMachine.standbyGuest",
     "VirtualMachine.create",
     "VirtualMachine.clone",
     "VirtualMachine.createFromExisting",
@@ -38,13 +36,6 @@ CORE_TASK_IDS = {
     "VirtualMachine.unregister",
     "VirtualMachine.relocate",
     "VirtualMachine.migrate",
-    "VirtualMachine.reconfigure",
-    "VirtualMachine.createSnapshot",
-    "VirtualMachine.removeSnapshot",
-    "VirtualMachine.removeAllSnapshots",
-    "VirtualMachine.revertToCurrentSnapshot",
-    "VirtualMachine.consolidateDisks",
-    "VirtualMachine.deploy",
 }
 
 CORE_TASK_NAMES = {
@@ -55,8 +46,6 @@ CORE_TASK_NAMES = {
     "Reset virtual machine",
     "Reboot Guest OS",
     "Shutdown guest OS",
-    "Suspend virtual machine",
-    "Standby Guest OS",
     "Create virtual machine",
     "Delete virtual machine",
     "Destroy virtual machine",
@@ -66,12 +55,6 @@ CORE_TASK_NAMES = {
     "Unregister virtual machine",
     "Relocate virtual machine",
     "Migrate virtual machine",
-    "Reconfigure virtual machine",
-    "Create virtual machine snapshot",
-    "Remove snapshot",
-    "Remove all snapshots",
-    "Revert virtual machine to snapshot",
-    "Consolidate virtual machine disks",
 }
 
 
